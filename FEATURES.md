@@ -1,108 +1,124 @@
-# JobBoard Features Guide 💡
+# Application Features
 
-This document details every core feature of **JobBoard**, explaining how it works and listing the frontend components, backend routers, and database tables implementing it.
-
----
-
-## 🔑 1. Role-Based JWT Authentication
-Handles registration, login, and secure session management for two user roles: **Job Seekers** and **Employers**.
-
-### How it works:
-1.  **Sign Up:** Users register specifying their role. If they choose `EMPLOYER`, they must specify a company name. The password is hashed using `bcryptjs` and stored in the database. A default empty profile record is created.
-2.  **Login:** Validates credentials and responds with user profile data, a short-lived Access Token (15 mins), and a long-lived Refresh Token (7 days).
-3.  **Token Refresh:** The React client interceptor automatically refreshes expired access tokens in the background on receipt of a `401 Unauthorized` response using the stored refresh token.
-4.  **Client State:** Persisted via a React Context hook (`useAuth`), making user info and authenticating fetch requests available globally.
-
-### Implemented by:
-*   **Database:** `User` and `Profile` models in [schema.prisma](file:///Users/karteeksai/Desktop/job_board/server/prisma/schema.prisma)
-*   **Backend Routes:** [auth.js](file:///Users/karteeksai/Desktop/job_board/server/routes/auth.js)
-*   **Middleware:** [auth.js](file:///Users/karteeksai/Desktop/job_board/server/middleware/auth.js) (JWT validation & role checks)
-*   **Frontend Context:** [AuthContext.jsx](file:///Users/karteeksai/Desktop/job_board/client/src/context/AuthContext.jsx)
-*   **Frontend Pages:** [Login.jsx](file:///Users/karteeksai/Desktop/job_board/client/src/pages/Login.jsx) & [Register.jsx](file:///Users/karteeksai/Desktop/job_board/client/src/pages/Register.jsx)
-*   **Guard Component:** [ProtectedRoute.jsx](file:///Users/karteeksai/Desktop/job_board/client/src/components/ProtectedRoute.jsx)
+This document provides a detailed breakdown of all features implemented in the JobBoard application, outlining their user-facing behavior and underlying technical implementations.
 
 ---
 
-## 🔍 2. Public Job Listings with Advanced Filters
-Enables guests and logged-in users to search and filter open positions.
+## Job Seeker Features
 
-### How it works:
-1.  **Keyword Search:** Queries job title, company name, or description using an insensitive SQL ILIKE match.
-2.  **Location Filter:** Allows text filter matching (e.g., "Remote", "San Francisco").
-3.  **Job Type / Experience Filters:** Supports multi-select arrays (Full-time, Part-time, Remote, Internship) and experience level checkmarks (Entry, Mid, Senior).
-4.  **Salary Range:** Filters jobs whose salary interval caps overlap with user-selected minimum/maximum boundaries.
-5.  **Sorting & Pagination:** Sorts results by date posted (newest) or maximum salary (high-to-low). Pages results in batches of 6 using Prisma `skip` and `take`.
+### Job Search and Filtering
+Seekers can search for open job listings using keyword search and refine the results using multi-select checkbox filters and salary inputs.
+*   **Technical Implementation**: 
+    *   **Page**: `src/app/page.tsx`
+    *   **Components**: `src/components/JobCard.tsx`, `src/components/SkeletonCard.tsx`
+    *   **API Endpoint**: `GET /api/jobs`
+    *   **Query Logic**: Uses Prisma's `findMany` database queries with case-insensitive `contains` operators for search strings and `in` filters for arrays of selected types/experience levels. Incorporates skip/take offset pagination.
+*   **Screenshot**:
+    ![Job Search and Filtering](./screenshots/job-search.png)
 
-### Implemented by:
-*   **Database:** `Job` model in [schema.prisma](file:///Users/karteeksai/Desktop/job_board/server/prisma/schema.prisma)
-*   **Backend API:** `GET /api/jobs` in [jobs.js](file:///Users/karteeksai/Desktop/job_board/server/routes/jobs.js)
-*   **Frontend Page:** [Home.jsx](file:///Users/karteeksai/Desktop/job_board/client/src/pages/Home.jsx) (handles sidebar filters, search state, and pagination)
-*   **UI Components:** [JobCard.jsx](file:///Users/karteeksai/Desktop/job_board/client/src/components/JobCard.jsx)
+### Job Application Flow
+Seekers can apply to a job posting by entering their details, writing an optional cover letter, and uploading a resume or using a saved resume.
+*   **Technical Implementation**:
+    *   **Page**: `src/app/jobs/[id]/page.tsx`
+    *   **API Endpoint**: `POST /api/applications/[jobId]`
+    *   **Query Logic**: Evaluates if the applicant has already applied. Saves the application records via Prisma's `application.create` linking the Seeker and Job models.
+*   **Screenshot**:
+    ![Job Application Flow](./screenshots/job-application-flow.png)
 
----
+### Bookmarking / Saved Jobs
+Seekers can bookmark job postings while browsing to save them for later application submissions.
+*   **Technical Implementation**:
+    *   **Page**: `src/app/page.tsx`, `src/app/jobs/[id]/page.tsx`, `src/app/seeker/page.tsx`
+    *   **API Endpoint**: `POST /api/seeker/bookmarks/[jobId]`
+    *   **Query Logic**: Toggles bookmark states. If a bookmark record matching `userId_jobId` exists, it deletes it; otherwise, it creates a new `Bookmark` record in the database.
+*   **Screenshot**:
+    ![Bookmarking / Saved Jobs](./screenshots/bookmarking-saved-jobs.png)
 
-## 📄 3. Job Details & Application Modal
-Renders description details and offers interactive candidate submission options.
+### Seeker Dashboard and Status Tracking
+Seekers have access to a dashboard displaying their submitted applications, saved job listings, and application progression pipelines.
+*   **Technical Implementation**:
+    *   **Page**: `src/app/seeker/page.tsx`
+    *   **API Endpoint**: `GET /api/seeker/dashboard`
+    *   **Query Logic**: Performs parallel transactions to fetch `application.findMany` (including job details) and `bookmark.findMany` filtered by the logged-in seeker's ID.
+*   **Screenshot**:
+    ![Seeker Dashboard](./screenshots/seeker-dashboard.png)
 
-### How it works:
-1.  **Views Increment:** Loading the page automatically increments the `views` counter for the job listing in the database.
-2.  **Bookmarks Toggle:** Job Seekers can bookmark/save the listing. Toggling deletes or creates a relational row.
-3.  **Link Sharing:** Copies the current browser URL to the user's clipboard and triggers a toast notification.
-4.  **Application Modal:** Opens a modal form pre-filled with the seeker's profile details.
-    *   Allows uploading a new resume document (processed via `Multer` and saved in `server/uploads/`).
-    *   Alternatively, seekers can opt to attach their saved profile resume.
-5.  **Related Jobs:** Matches the current listing with other postings sharing similar types or locations.
-
-### Implemented by:
-*   **Database:** `Job`, `Application`, and `Bookmark` models in [schema.prisma](file:///Users/karteeksai/Desktop/job_board/server/prisma/schema.prisma)
-*   **Backend API:**
-    *   `GET /api/jobs/:id` in [jobs.js](file:///Users/karteeksai/Desktop/job_board/server/routes/jobs.js)
-    *   `POST /api/applications/:jobId` in [applications.js](file:///Users/karteeksai/Desktop/job_board/server/routes/applications.js)
-*   **Frontend Page:** [JobDetail.jsx](file:///Users/karteeksai/Desktop/job_board/client/src/pages/JobDetail.jsx)
-
----
-
-## 💼 4. Job Seeker Dashboard
-A private workspace for seekers to track applications and customize resume settings.
-
-### How it works:
-*   **Applications Tab:** Lists all submitted roles alongside real-time status banners (Applied, Shortlisted, Hired, Rejected).
-*   **Bookmarks Tab:** Lists all saved jobs for quick access, including clear buttons to revoke bookmarks.
-*   **Profile Tab:** Edits seeker name, professional title, biography paragraph, and comma-separated skills list. Displays a preview link of their saved resume.
-
-### Implemented by:
-*   **Backend API:** [seeker.js](file:///Users/karteeksai/Desktop/job_board/server/routes/seeker.js)
-*   **Frontend Page:** [SeekerDashboard.jsx](file:///Users/karteeksai/Desktop/job_board/client/src/pages/SeekerDashboard.jsx)
+### Seeker Resume / Profile Management
+Seekers can update their name, professional title, skills list, bio descriptions, and view their currently saved resume.
+*   **Technical Implementation**:
+    *   **Page**: `src/app/seeker/page.tsx` (Profile tab)
+    *   **API Endpoint**: `PUT /api/seeker/profile`
+    *   **Query Logic**: Updates the user's name on the `User` database model and profile fields on the `Profile` database model in a transaction wrapper.
+*   **Screenshot**:
+    ![Profile Management](./screenshots/profile-management.png)
 
 ---
 
-## 📊 5. Employer Dashboard & Analytics
-A workspace for employers to publish listings, manage candidates, and track stats.
+## Employer Features
 
-### How it works:
-*   **Analytics Tab:** Renders total listings published, accumulated views across all jobs, total applicants, and a grid summary of candidate pipeline counts.
-*   **Manage Postings Tab:** Lists published roles, views/applicant counters per posting, and triggers to edit or delete posts.
-*   **Candidate Pipeline Tab:** Displays all candidates who applied, details of their cover letters, links to download their resumes, and a dropdown selector to update candidate pipeline statuses.
-*   **Post/Edit Tab:** A full-form page used to post new job roles or update existing listings.
+### Job Posting Creation and Management
+Employers can create new job listings by filling in requirements, type details, salary caps, and descriptions, and can edit or delete existing postings.
+*   **Technical Implementation**:
+    *   **Page**: `src/app/employer/page.tsx` (Post / Edit tab)
+    *   **API Endpoints**: `POST /api/jobs` (Create), `PUT /api/jobs/[id]` (Update), `DELETE /api/jobs/[id]` (Delete)
+    *   **Query Logic**: Validates employer ownership before updating or deleting listings. Deletes cascaded applications and bookmarks automatically.
+*   **Screenshot**:
+    ![Job Posting Management](./screenshots/job-posting-management.png)
 
-### Implemented by:
-*   **Backend API:**
-    *   `GET /api/analytics/employer` in [analytics.js](file:///Users/karteeksai/Desktop/job_board/server/routes/analytics.js)
-    *   `GET /api/applications/employer` in [applications.js](file:///Users/karteeksai/Desktop/job_board/server/routes/applications.js)
-*   **Frontend Page:** [EmployerDashboard.jsx](file:///Users/karteeksai/Desktop/job_board/client/src/pages/EmployerDashboard.jsx)
+### Applicant Tracking and Status Pipeline
+Employers can view all candidates who applied to their postings, read cover letters, view resumes, and update status markers in the pipeline.
+*   **Technical Implementation**:
+    *   **Page**: `src/app/employer/page.tsx` (Pipeline tab)
+    *   **API Endpoints**: `GET /api/applications/employer` (List), `PATCH /api/applications/status/[id]` (Update status)
+    *   **Query Logic**: Checks if the target application's job was posted by the requesting employer. Performs a `PATCH` updating the `status` string field to `APPLIED`, `SHORTLISTED`, `HIRED`, or `REJECTED`.
+*   **Screenshot**:
+    ![Applicant Tracking Pipeline](./screenshots/applicant-tracking-pipeline.png)
+
+### Employer Workspace Analytics
+Employers can monitor recruitment health, overviewing total listing counts, accumulated views, total candidates, and status splits.
+*   **Technical Implementation**:
+    *   **Page**: `src/app/employer/page.tsx` (Analytics tab)
+    *   **API Endpoint**: `GET /api/analytics/employer`
+    *   **Query Logic**: Gathers aggregate view counts and candidate numbers using Prisma aggregations (`_count`) on jobs posted by the employer's ID.
+*   **Screenshot**:
+    ![Employer Workspace Analytics](./screenshots/employer-workspace-analytics.png)
 
 ---
 
-## 🎨 6. Global UX Polish
-Improves system layout flows and interaction states:
-*   **Dark Mode Toggle:** Integrates local theme toggles in `Navbar.jsx` that add or remove the `.dark` class from `<html>`. Tailwind v4 compiles selectors using native styling.
-*   **Shimmer Loading Skeletons:** Styled divs in `SkeletonCard.jsx` showing animated gray gradients during asynchronous load times instead of generic progress spinners.
-*   **Toast Notifications:** Dispatches clean success or warning alert cards via `react-hot-toast` for application submissions, profile updates, and authentication state changes.
-*   **Form Accessibilities:** Standard input wrappers containing descriptive `<label>` tags, keyboard tab indexing, and clear validation attributes.
+## Platform Features
 
-### Implemented by:
-*   **Styles:** [index.css](file:///Users/karteeksai/Desktop/job_board/client/src/index.css) (shimmer animations, CSS theme configurations)
-*   **UI Components:**
-    *   [Navbar.jsx](file:///Users/karteeksai/Desktop/job_board/client/src/components/Navbar.jsx) (dark mode theme toggle)
-    *   [SkeletonCard.jsx](file:///Users/karteeksai/Desktop/job_board/client/src/components/SkeletonCard.jsx)
-    *   [App.jsx](file:///Users/karteeksai/Desktop/job_board/client/src/App.jsx) (Toaster integration)
+### Authentication and Session Management
+Secures user signup and logins, storing credentials using JWT tokens stored inside HTTP-Only Cookies to prevent client-side script theft.
+*   **Technical Implementation**:
+    *   **Pages**: `src/app/login/page.tsx`, `src/app/register/page.tsx`
+    *   **Components**: `src/context/AuthContext.tsx`
+    *   **API Endpoints**: `/api/auth/signup`, `/api/auth/login`, `/api/auth/logout`, `/api/auth/me`, `/api/auth/refresh`
+    *   **JWT Logic**: Access tokens (valid for 15 minutes) and Refresh tokens (valid for 7 days) are set in HTTP-only cookies. Edge middleware (`src/middleware.ts`) checks these cookies for protected route access and performs role-based redirection.
+*   **Screenshot**:
+    ![Authentication](./screenshots/authentication.png)
+
+### Cloud File Storage (Vercel Blob Uploads)
+Enables resume document uploads, storing files dynamically in Vercel Blob cloud storage with fallback local disk support.
+*   **Technical Implementation**:
+    *   **SDK**: `@vercel/blob`
+    *   **API Endpoint**: `/api/applications/[jobId]`
+    *   **Upload Logic**: Reads requests as Form Data, converts files to ArrayBuffers, and uploads via `put()` to Vercel Blob. Falls back to writing files to `/public/uploads/` on disk for offline local development if the Vercel API key is absent.
+*   **Screenshot**:
+    ![Cloud File Storage](./screenshots/file-upload.png)
+
+### Native Dark Theme Preference
+Provides custom theme selection supporting user system presets or explicit light/dark overrides.
+*   **Technical Implementation**:
+    *   **Component**: `src/components/Navbar.tsx`
+    *   **Styling**: `src/app/globals.css`
+    *   **Theme Logic**: Adds or removes the `.dark` class from the `html` root element. Persists choice locally using `window.localStorage`.
+*   **Screenshot**:
+    ![Dark Theme Preference](./screenshots/dark-theme.png)
+
+### Mobile-First Responsive Design
+Adapts application screens seamlessly across varying device resolutions.
+*   **Technical Implementation**:
+    *   **Component**: `src/components/Navbar.tsx` (Mobile Drawer menu), `src/app/page.tsx` (Mobile filter panel drawer)
+    *   **Styling**: Compiles flexible grid displays, responsive flex alignments, and collapse drawer widgets using Tailwind CSS.
+*   **Screenshot**:
+    ![Mobile Responsive Design](./screenshots/responsive-design.png)

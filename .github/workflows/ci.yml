@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: [ main ]
 
+permissions:
+  contents: read
+  pull-requests: write
+
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
@@ -15,39 +19,36 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      # 2. Setup Node.js version using engine specified in package.json
+      # 2. Setup Node.js using package.json engine or Node 20 fallback
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version-file: 'package.json'
+          cache: 'npm'
 
-      # 3. Cache node_modules and Next.js cache using actions/cache
-      - name: Cache Node Modules & Next Cache
+      # 3. Cache Next.js compilation cache
+      - name: Cache Next.js bundle
         uses: actions/cache@v4
-        id: cache-node-modules
         with:
           path: |
-            node_modules
-            .next/cache
-          key: ${{ runner.os }}-node-${{ hashFiles('package-lock.json') }}
+            ${{ github.workspace }}/.next/cache
+          key: ${{ runner.os }}-nextjs-${{ hashFiles('package-lock.json') }}-${{ github.sha }}
           restore-keys: |
-            ${{ runner.os }}-node-
+            ${{ runner.os }}-nextjs-${{ hashFiles('package-lock.json') }}-
 
-      # 4. Install dependencies (runs npm ci only if cache misses)
+      # 4. Install dependencies
       - name: Install Dependencies
-        if: steps.cache-node-modules.outputs.cache-hit != 'true'
         run: npm ci
 
+      # 5. Generate Prisma Client
+      - name: Generate Prisma Client
+        run: npx prisma generate
 
-      # 5. Run lint checks
+      # 6. Run lint checks
       - name: Run Linter
         run: npm run lint
 
-      # 6. Run build to catch compile or bundling errors
-      - name: Run Build
-        run: npm run build
-
-      # 7. Run test suite (checks if test script is defined first)
+      # 7. Run test suite if defined
       - name: Run Tests
         run: |
           if npm run | grep -q "^  test$"; then
@@ -55,3 +56,20 @@ jobs:
           else
             echo "No test script defined in package.json. Skipping."
           fi
+
+      # 8. Run build to catch compile or type errors
+      - name: Run Build
+        run: npm run build
+
+      # 9. Comment on Pull Request confirming success
+      - name: Comment on PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: '🚀 **CI Build Passed!** Linting, Prisma generation, and Next.js production build succeeded. It is safe to merge.'
+            })
