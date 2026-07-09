@@ -2,8 +2,23 @@ import { NextResponse } from 'next/server';
 import { join } from 'path';
 import { writeFile, mkdir } from 'fs/promises';
 import { existsSync } from 'fs';
+import { put } from '@vercel/blob';
 import { prisma } from '@/lib/prisma';
 import { getAuthenticatedUser } from '@/lib/auth-helper';
+
+async function saveLocalFile(resumeFile: File, filename: string): Promise<string> {
+  const bytes = await resumeFile.arrayBuffer();
+  const buffer = Buffer.from(bytes);
+  
+  const publicUploadsDir = join(process.cwd(), 'public', 'uploads');
+  if (!existsSync(publicUploadsDir)) {
+    await mkdir(publicUploadsDir, { recursive: true });
+  }
+  
+  const filepath = join(publicUploadsDir, filename);
+  await writeFile(filepath, buffer);
+  return `/uploads/${filename}`;
+}
 
 // POST /api/applications/[jobId] (Seeker only, apply to a job)
 export async function POST(request: Request, { params }: { params: Promise<{ jobId: string }> }) {
@@ -50,20 +65,21 @@ export async function POST(request: Request, { params }: { params: Promise<{ job
 
     // Handle resume file upload or use existing resume
     if (resumeFile && resumeFile.size > 0) {
-      const bytes = await resumeFile.arrayBuffer();
-      const buffer = Buffer.from(bytes);
-      
-      // Ensure public/uploads directory exists
-      const publicUploadsDir = join(process.cwd(), 'public', 'uploads');
-      if (!existsSync(publicUploadsDir)) {
-        await mkdir(publicUploadsDir, { recursive: true });
-      }
-      
       const filename = `${Date.now()}-${resumeFile.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
-      const filepath = join(publicUploadsDir, filename);
-      await writeFile(filepath, buffer);
       
-      resumeUrl = `/uploads/${filename}`;
+      // If Vercel Blob read/write token is present, use Vercel Blob for cloud storage
+      if (process.env.BLOB_READ_WRITE_TOKEN) {
+        try {
+          const blob = await put(filename, resumeFile, { access: 'public' });
+          resumeUrl = blob.url;
+        } catch (err) {
+          console.error('Vercel Blob upload failed, falling back to local file upload:', err);
+          resumeUrl = await saveLocalFile(resumeFile, filename);
+        }
+      } else {
+        // Local dev filesystem fallback
+        resumeUrl = await saveLocalFile(resumeFile, filename);
+      }
       
       // Update seeker's profile with this resume url
       await prisma.profile.update({

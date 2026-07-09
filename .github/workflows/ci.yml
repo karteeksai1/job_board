@@ -21,26 +21,23 @@ jobs:
         with:
           node-version-file: 'package.json'
 
-      # 3. Cache node_modules using actions/cache
-      - name: Cache Node Modules
+      # 3. Cache node_modules and Next.js cache using actions/cache
+      - name: Cache Node Modules & Next Cache
         uses: actions/cache@v4
         id: cache-node-modules
         with:
           path: |
             node_modules
-            client/node_modules
-            server/node_modules
-          key: ${{ runner.os }}-node-${{ hashFiles('package-lock.json', 'client/package-lock.json', 'server/package-lock.json') }}
+            .next/cache
+          key: ${{ runner.os }}-node-${{ hashFiles('package-lock.json') }}
           restore-keys: |
             ${{ runner.os }}-node-
 
       # 4. Install dependencies (runs npm ci only if cache misses)
-      - name: Install Monorepo Dependencies
+      - name: Install Dependencies
         if: steps.cache-node-modules.outputs.cache-hit != 'true'
-        run: |
-          npm ci
-          npm ci --prefix client
-          npm ci --prefix server
+        run: npm ci
+
 
       # 5. Run lint checks
       - name: Run Linter
