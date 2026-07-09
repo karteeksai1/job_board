@@ -176,6 +176,11 @@ This application is configured for deployment on **Vercel**:
 *   **CI/CD Pipeline**: GitHub Actions runs lint, build, and test steps on every pull request to compile checking types and catch compilation errors.
 *   **Vercel Auto-Deployment**: Vercel integrates directly with the GitHub repository, automatically triggering production deployments upon successful merges to the `main` branch.
 
+## Development Process
+
+*   **Built with Antigravity**: Project architecture, CI/CD pipeline, and files structure migrated using Google Antigravity AI coding assistant.
+*   **Documentation & Verification**: All documents (including `API.md` and `FEATURES.md`) were generated with AI assistance and manually verified for type safety and execution parameters.
+
 ## License
 
 This project is licensed under the [MIT License](LICENSE).
