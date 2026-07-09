@@ -1,0 +1,60 @@
+name: CI Pipeline
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Checkout repository code
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      # 2. Setup Node.js version using engine specified in package.json
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: 'package.json'
+
+      # 3. Cache node_modules using actions/cache
+      - name: Cache Node Modules
+        uses: actions/cache@v4
+        id: cache-node-modules
+        with:
+          path: |
+            node_modules
+            client/node_modules
+            server/node_modules
+          key: ${{ runner.os }}-node-${{ hashFiles('package-lock.json', 'client/package-lock.json', 'server/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
+
+      # 4. Install dependencies (runs npm ci only if cache misses)
+      - name: Install Monorepo Dependencies
+        if: steps.cache-node-modules.outputs.cache-hit != 'true'
+        run: |
+          npm ci
+          npm ci --prefix client
+          npm ci --prefix server
+
+      # 5. Run lint checks
+      - name: Run Linter
+        run: npm run lint
+
+      # 6. Run build to catch compile or bundling errors
+      - name: Run Build
+        run: npm run build
+
+      # 7. Run test suite (checks if test script is defined first)
+      - name: Run Tests
+        run: |
+          if npm run | grep -q "^  test$"; then
+            npm test
+          else
+            echo "No test script defined in package.json. Skipping."
+          fi
