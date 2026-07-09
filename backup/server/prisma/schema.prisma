@@ -1,0 +1,85 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id           String        @id @default(uuid())
+  email        String        @unique
+  passwordHash String
+  role         String        // "JOB_SEEKER" or "EMPLOYER"
+  name         String
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  profile      Profile?
+  jobs         Job[]         // Jobs posted by this user (Employer only)
+  applications Application[] // Applications sent by this user (Seeker only)
+  bookmarks    Bookmark[]    // Bookmarked jobs by this user (Seeker only)
+}
+
+model Profile {
+  id             String   @id @default(uuid())
+  userId         String   @unique
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bio            String?  @db.Text
+  title          String?  // e.g. "Senior React Developer"
+  resumeUrl      String?  // path to uploaded resume
+  skills         String?  // comma-separated list of skills
+  companyName    String?  // (For employer profile)
+  companyLogo    String?  // (For employer profile)
+  companyWebsite String?  // (For employer profile)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+model Job {
+  id              String        @id @default(uuid())
+  employerId      String
+  employer        User          @relation(fields: [employerId], references: [id], onDelete: Cascade)
+  title           String
+  companyName     String
+  companyLogo     String?       // URL or symbol string
+  location        String        // e.g., "New York, NY", "Remote"
+  jobType         String        // "FULL_TIME", "PART_TIME", "REMOTE", "INTERNSHIP"
+  experienceLevel String        // "ENTRY", "MID", "SENIOR"
+  salaryMin       Int?
+  salaryMax       Int?
+  description     String        @db.Text
+  requirements    String        @db.Text // newline or dot-separated block
+  responsibilities String       @db.Text // newline or dot-separated block
+  views           Int           @default(0)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  applications    Application[]
+  bookmarks       Bookmark[]
+}
+
+model Application {
+  id          String   @id @default(uuid())
+  jobId       String
+  job         Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  seekerId    String
+  seeker      User     @relation(fields: [seekerId], references: [id], onDelete: Cascade)
+  name        String
+  email       String
+  resumeUrl   String
+  coverLetter String?  @db.Text
+  status      String   @default("APPLIED") // "APPLIED", "SHORTLISTED", "REJECTED", "HIRED"
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Bookmark {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  jobId     String
+  job       Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, jobId])
+}

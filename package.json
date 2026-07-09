@@ -1,19 +1,38 @@
 {
-  "name": "job-board-monorepo",
+  "name": "job-board-next",
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "install-all": "npm install && npm install --prefix client && npm install --prefix server",
-    "client": "npm run dev --prefix client",
-    "server": "npm run dev --prefix server",
-    "dev": "concurrently \"npm run server\" \"npm run client\"",
-    "db:migrate": "npm run db:migrate --prefix server",
-    "db:seed": "npm run db:seed --prefix server",
-    "build": "npm run build --prefix client",
-    "lint": "npm run lint --prefix client"
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "db:migrate": "prisma migrate dev",
+    "db:seed": "tsx prisma/seed.ts"
+  },
+  "dependencies": {
+    "@prisma/client": "^5.14.0",
+    "bcryptjs": "^2.4.3",
+    "jsonwebtoken": "^9.0.2",
+    "lucide-react": "^1.24.0",
+    "next": "^15.1.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "react-hot-toast": "^2.6.0"
   },
   "devDependencies": {
-    "concurrently": "^8.2.2"
+    "@types/bcryptjs": "^2.4.6",
+    "@types/jsonwebtoken": "^9.0.6",
+    "@types/node": "^20.11.24",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "eslint": "^8.57.0",
+    "eslint-config-next": "^15.1.0",
+    "postcss": "^8.4.35",
+    "prisma": "^5.14.0",
+    "tailwindcss": "^4.0.0",
+    "tsx": "^4.7.1",
+    "typescript": "^5.3.3"
   },
   "engines": {
     "node": ">=22.0.0"
