@@ -6,4 +6,5 @@ build/
 server/uploads/*
 !server/uploads/.gitkeep
 .DS_Store
+.env.example
 *.log
