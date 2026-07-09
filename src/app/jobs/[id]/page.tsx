@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
 import { getLogoColor, formatDate } from '@/components/JobCard';
@@ -14,7 +14,9 @@ interface JobDetailPageProps {
 
 export default function JobDetailPage({ params }: JobDetailPageProps) {
   const router = useRouter();
+  const pathname = usePathname();
   const { id } = React.use(params);
+
   const { user, authFetch } = useAuth();
 
   const [job, setJob] = useState<any>(null);
@@ -236,8 +238,8 @@ export default function JobDetailPage({ params }: JobDetailPageProps) {
   };
 
   // Convert requirements and responsibilities to list formats
-  const requirementsList = requirements.split('\n').filter((r: string) => r.trim().length > 0);
-  const responsibilitiesList = responsibilities.split('\n').filter((r: string) => r.trim().length > 0);
+  const requirementsList: string[] = (requirements as string).split('\n').filter((r: string) => r.trim().length > 0);
+  const responsibilitiesList: string[] = (responsibilities as string).split('\n').filter((r: string) => r.trim().length > 0);
 
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -362,7 +364,7 @@ export default function JobDetailPage({ params }: JobDetailPageProps) {
               <div>
                 <h2 className="text-lg font-bold text-slate-900 dark:text-white mb-3">Requirements</h2>
                 <ul className="list-disc pl-5 text-slate-600 dark:text-slate-300 text-sm space-y-2">
-                  {requirementsList.map((req, i) => (
+                  {requirementsList.map((req: string, i: number) => (
                     <li key={i}>{req}</li>
                   ))}
                 </ul>
@@ -373,7 +375,7 @@ export default function JobDetailPage({ params }: JobDetailPageProps) {
               <div>
                 <h2 className="text-lg font-bold text-slate-900 dark:text-white mb-3">Responsibilities</h2>
                 <ul className="list-disc pl-5 text-slate-600 dark:text-slate-300 text-sm space-y-2">
-                  {responsibilitiesList.map((resp, i) => (
+                  {responsibilitiesList.map((resp: string, i: number) => (
                     <li key={i}>{resp}</li>
                   ))}
                 </ul>
